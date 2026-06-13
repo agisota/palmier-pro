@@ -14,14 +14,14 @@ enum SpokenIndexer {
 
     /// False until a transcript exists — transcription creates the work, not the file alone.
     static func needsIndex(url: URL) -> Bool {
-        guard SpokenModel.anyAvailable, TranscriptCache.hasCachedOnDisk(for: url),
+        guard SpokenModel.anyAvailable, let stamp = TranscriptCache.diskStamp(for: url),
               let key = EmbeddingStore.key(for: url) else { return false }
         guard let header = EmbeddingStore.header(key: spokenKey(key)) else { return true }
-        return !isCurrent(header)
+        return !isCurrent(header, stamp: stamp)
     }
 
-    private static func isCurrent(_ h: EmbeddingStore.Header) -> Bool {
-        guard h.samplerVersion == poolingVersion else { return false }
+    private static func isCurrent(_ h: EmbeddingStore.Header, stamp: String) -> Bool {
+        guard h.samplerVersion == poolingVersion, h.sourceStamp == stamp else { return false }
         if h.model == unsupportedModelID { return true }
         guard let family = SpokenModel(rawValue: h.model) else { return false }
         return h.modelVersion == family.revision
@@ -30,10 +30,11 @@ enum SpokenIndexer {
     static func index(url: URL) async throws {
         guard SpokenModel.anyAvailable, needsIndex(url: url),
               let key = EmbeddingStore.key(for: url),
+              let stamp = TranscriptCache.diskStamp(for: url),
               let transcript = TranscriptCache.cachedOnDisk(for: url) else { return }
 
         guard let family = SpokenModel.family(forBCP47: transcript.language) else {
-            try save(modelID: unsupportedModelID, version: 0, dim: 1, rows: [], vectors: [], key: key)
+            try save(modelID: unsupportedModelID, version: 0, dim: 1, rows: [], vectors: [], stamp: stamp, key: key)
             return
         }
         // Model assets not ready: skip without writing so a later sweep retries.
@@ -49,16 +50,16 @@ enum SpokenIndexer {
             vectors += v
             rows.append(EmbeddingStore.Row(time: window.start, shotStart: window.start, shotEnd: window.end))
         }
-        try save(modelID: family.rawValue, version: family.revision, dim: dim, rows: rows, vectors: vectors, key: key)
+        try save(modelID: family.rawValue, version: family.revision, dim: dim, rows: rows, vectors: vectors, stamp: stamp, key: key)
     }
 
     private static func save(
         modelID: String, version: Int, dim: Int,
-        rows: [EmbeddingStore.Row], vectors: [Float], key: String
+        rows: [EmbeddingStore.Row], vectors: [Float], stamp: String, key: String
     ) throws {
         let header = EmbeddingStore.Header(
             model: modelID, modelVersion: version,
-            samplerVersion: poolingVersion, dim: dim, count: rows.count
+            samplerVersion: poolingVersion, dim: dim, count: rows.count, sourceStamp: stamp
         )
         try EmbeddingStore.save(header: header, rows: rows, vectors: vectors, key: spokenKey(key))
     }

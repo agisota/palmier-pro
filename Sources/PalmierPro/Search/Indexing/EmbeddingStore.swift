@@ -10,6 +10,7 @@ struct EmbeddingStore {
         let samplerVersion: Int
         let dim: Int
         let count: Int
+        var sourceStamp: String?
     }
 
     struct Row {
