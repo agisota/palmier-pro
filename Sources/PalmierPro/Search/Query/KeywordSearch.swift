@@ -1,14 +1,7 @@
 import Foundation
 
-/// Keyword search over cached transcripts
-enum TranscriptSearch {
-    struct Hit: Equatable {
-        let assetID: String
-        let start: Double
-        let end: Double
-        let text: String
-    }
-
+/// Exact-keyword tier of SpokenSearch: cached transcripts, all query words in any order.
+enum KeywordSearch {
     /// Query split into words, edge punctuation stripped (so "budget," → "budget").
     static func terms(in query: String) -> [String] {
         query.split(whereSeparator: \.isWhitespace)
@@ -20,16 +13,15 @@ enum TranscriptSearch {
         terms.allSatisfy { text.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
     }
 
-    /// Segments containing all query words, in any order.
-    static func search(query: String, assets: [(id: String, url: URL)], limit: Int = 20) -> [Hit] {
+    static func search(query: String, assets: [(id: String, url: URL)], limit: Int = 20) -> [SpokenSearch.Hit] {
         let terms = terms(in: query)
         guard !terms.isEmpty else { return [] }
 
-        var hits: [Hit] = []
+        var hits: [SpokenSearch.Hit] = []
         for asset in assets {
             guard let transcript = TranscriptCache.cachedOnDisk(for: asset.url) else { continue }
             for segment in transcript.segments where matches(segment.text, terms: terms) {
-                hits.append(Hit(assetID: asset.id, start: segment.start, end: segment.end, text: segment.text))
+                hits.append(SpokenSearch.Hit(assetID: asset.id, start: segment.start, end: segment.end, text: segment.text))
                 if hits.count >= limit { return hits }
             }
         }

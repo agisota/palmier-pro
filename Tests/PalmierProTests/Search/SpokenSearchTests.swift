@@ -13,7 +13,7 @@ struct SpokenSearchMergeTests {
     }
 
     @Test func keywordOutranksSemanticAndDedupes() {
-        let keyword = [TranscriptSearch.Hit(assetID: "a", start: 5, end: 8, text: "the budget doubled")]
+        let keyword = [SpokenSearch.Hit(assetID: "a", start: 5, end: 8, text: "the budget doubled")]
         let semantic = [
             VisualSearch.Hit(assetID: "a", time: 5, shotStart: 5, shotEnd: 8, score: 0.9),   // dupe of keyword hit
             VisualSearch.Hit(assetID: "a", time: 12, shotStart: 12, shotEnd: 15, score: 0.8),

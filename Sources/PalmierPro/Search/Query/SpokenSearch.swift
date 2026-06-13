@@ -4,10 +4,17 @@ import Foundation
 /// Semantic matching runs per model family — the query is embedded once per family
 /// present in the library and ranked only against that family's indexes.
 enum SpokenSearch {
+    struct Hit: Equatable {
+        let assetID: String
+        let start: Double
+        let end: Double
+        let text: String
+    }
+
     static func search(
         query: String, assets: [(id: String, url: URL)], limit: Int = 20
-    ) async -> [TranscriptSearch.Hit] {
-        let keyword = TranscriptSearch.search(query: query, assets: assets, limit: limit)
+    ) async -> [Hit] {
+        let keyword = KeywordSearch.search(query: query, assets: assets, limit: limit)
         guard keyword.count < limit, SpokenModel.anyAvailable else { return keyword }
 
         var byFamily: [SpokenModel: [(String, EmbeddingStore.AssetIndex)]] = [:]
@@ -33,11 +40,11 @@ enum SpokenSearch {
 
     /// Appends semantic hits below the keyword tier, skipping segments keyword already found.
     static func merge(
-        keyword: [TranscriptSearch.Hit],
+        keyword: [Hit],
         semantic: [VisualSearch.Hit],
         transcripts: [String: TranscriptionResult],
         limit: Int
-    ) -> [TranscriptSearch.Hit] {
+    ) -> [Hit] {
         var seen = Set(keyword.map { "\($0.assetID)@\($0.start)" })
         var hits = keyword
         for s in semantic {
@@ -47,7 +54,7 @@ enum SpokenSearch {
                   let text = windowText(transcripts[s.assetID], start: s.shotStart, end: s.shotEnd)
             else { continue }
             seen.insert(dedupeKey)
-            hits.append(TranscriptSearch.Hit(assetID: s.assetID, start: s.shotStart, end: s.shotEnd, text: text))
+            hits.append(Hit(assetID: s.assetID, start: s.shotStart, end: s.shotEnd, text: text))
         }
         return hits
     }
